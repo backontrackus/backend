@@ -19,3 +19,8 @@
 
 # Go workspace file
 go.work
+
+# Pocketbase data
+pb_data
+pb_migrations
+pb_public
