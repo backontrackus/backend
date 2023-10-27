@@ -54,6 +54,7 @@ func main() {
 		return nil
 	})
 
+	// Announcements notifications
 	app.OnRecordAfterCreateRequest().Add(func(e *core.RecordCreateEvent) error {
 		if e.Collection.Name == "announcements" {
 			location := e.Record.GetString("location")
@@ -98,6 +99,66 @@ func main() {
 
 			for _, t := range tokens {
 				announce(app, e.Record, t)
+			}
+		}
+
+		return nil
+	})
+
+	app.OnRecordAfterCreateRequest().Add(func (e *core.RecordCreateEvent) error {
+		if e.Collection.Name == "messages" {
+			app.Dao().ExpandRecord(e.Record, []string{"channel"}, nil)
+			channel := e.Record.Expand()["channel"].(*models.Record)
+			app.Dao().ExpandRecord(channel, []string{"users"}, nil)
+			users := channel.Expand()["users"].([]*models.Record)
+			
+			tokens := []string{}
+
+			for _, u := range users {
+				if u.Id == e.Record.GetString("user") {
+					continue
+				}
+
+				app.Dao().ExpandRecord(u, []string{"devices"}, nil)
+				devices := u.Expand()["devices"]
+
+				if devices != nil {
+					for _, d := range devices.([]*models.Record) {
+						tokens = append(tokens, d.GetString("token"))
+					}
+				}
+			}
+
+			client := expo.NewPushClient(nil)
+
+			for _, t := range tokens {
+				pushToken, err := expo.NewExponentPushToken(t)
+			
+				if err != nil {
+					log.Default().Panicln(err)
+				}
+			
+				app.Dao().ExpandRecord(e.Record, []string{"user"}, nil)
+				user := e.Record.Expand()["user"].(*models.Record)
+				user_name := user.GetString("name")
+				title := fmt.Sprint("New announcement from ", user_name)
+				body := e.Record.GetString("content")
+			
+				response, err := client.Publish(
+					&expo.PushMessage{
+						To: []expo.ExponentPushToken{pushToken},
+						Body: body,
+						Title: title,
+					},
+				)
+			
+				if err != nil {
+					log.Default().Panicln(err)
+				}
+			
+				if response.ValidateResponse() != nil {
+					fmt.Println(response.PushMessage.To, "failed")
+				}
 			}
 		}
 
