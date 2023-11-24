@@ -2,10 +2,13 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
+	ics "github.com/arran4/golang-ical"
 	"github.com/labstack/echo/v5"
 	expo "github.com/oliveroneill/exponent-server-sdk-golang/sdk"
 	"github.com/pocketbase/dbx"
@@ -129,6 +132,77 @@ func main() {
 		return nil
 	})
 
+	// Add ical to public dir
+	app.OnRecordAfterCreateRequest("announcements").Add(func (e *core.RecordCreateEvent) error {
+		location_file, _ := os.ReadFile("./pb_public/" + e.Record.GetString("location") + ".ics")
+		location_cal, _ := ics.ParseCalendar(strings.NewReader(string(location_file)))
+		
+		announcement_files := e.UploadedFiles["calendar"]
+		if len(announcement_files) == 0 {
+			return nil
+		}
+		file := announcement_files[0]
+		if file == nil {
+			return nil
+		}
+		r, _ := file.Reader.Open()
+		data, _ := io.ReadAll(r)
+		cal_str := string(data)
+		announcement_cal, _ := ics.ParseCalendar(strings.NewReader(cal_str))
+
+		for _, v := range announcement_cal.Events() {
+			new_event := location_cal.AddEvent(v.Id())
+			new_event.SetSummary(v.GetProperty("SUMMARY").Value)
+			start, _ := v.GetStartAt()
+			new_event.SetStartAt(start)
+			end, _ := v.GetEndAt()
+			new_event.SetEndAt(end)
+			new_event.SetLocation(v.GetProperty("LOCATION").Value)
+		}
+
+		text := location_cal.Serialize()
+
+		f, _ := os.Create("./pb_public/" + e.Record.GetString("location") + ".ics")
+		f.Write([]byte(text))
+		
+		return nil
+	})
+
+	app.OnRecordAfterUpdateRequest("announcements").Add(func (e *core.RecordUpdateEvent) error {
+		location_file, _ := os.ReadFile("./pb_public/" + e.Record.GetString("location") + ".ics")
+		location_cal, _ := ics.ParseCalendar(strings.NewReader(string(location_file)))
+		
+		announcement_files := e.UploadedFiles["calendar"]
+		if len(announcement_files) == 0 {
+			return nil
+		}
+		file := announcement_files[0]
+		if file == nil {
+			return nil
+		}
+		r, _ := file.Reader.Open()
+		data, _ := io.ReadAll(r)
+		cal_str := string(data)
+		announcement_cal, _ := ics.ParseCalendar(strings.NewReader(cal_str))
+
+		for _, v := range announcement_cal.Events() {
+			new_event := location_cal.AddEvent(v.Id())
+			new_event.SetSummary(v.GetProperty("SUMMARY").Value)
+			start, _ := v.GetStartAt()
+			new_event.SetStartAt(start)
+			end, _ := v.GetEndAt()
+			new_event.SetEndAt(end)
+			new_event.SetLocation(v.GetProperty("LOCATION").Value)
+		}
+
+		text := location_cal.Serialize()
+
+		f, _ := os.Create("./pb_public/" + e.Record.GetString("location") + ".ics")
+		f.Write([]byte(text))
+		
+		return nil
+	})
+
 	// Push notifications for messages
 	app.OnRecordAfterCreateRequest("messages").Add(func (e *core.RecordCreateEvent) error {
 		app.Dao().ExpandRecord(e.Record, []string{"channel"}, nil)
@@ -204,6 +278,20 @@ func main() {
 		new_message.Set("channel", new_channel.Id)
 		new_message.Set("content", "This is the channel for the location \"" + e.Record.GetString("name") + "\"")
 		app.Dao().SaveRecord(new_message)
+
+		return nil
+	})
+
+	// Create location ical
+	app.OnRecordAfterCreateRequest("locations").Add(func (e *core.RecordCreateEvent) error {
+		cal := ics.NewCalendar()
+		cal.SetMethod(ics.MethodRequest)
+		cal.SetName(e.Record.GetString("name"))
+
+		text := cal.Serialize()
+
+		f, _ := os.Create("./pb_public/" + e.Record.Id + ".ics")
+		f.Write([]byte(text))
 
 		return nil
 	})
