@@ -118,6 +118,14 @@ func main() {
 		new_channel.Set("announcement", e.Record.Id)
 		app.Dao().SaveRecord(new_channel)
 
+		// Create initial message
+		messages_collection, _ := app.Dao().FindCollectionByNameOrId("messages")
+		new_message := models.NewRecord(messages_collection)
+		new_message.Set("user", e.Record.GetString("user"))
+		new_message.Set("channel", new_channel.Id)
+		new_message.Set("content", "This is the channel for the announcement \"" + e.Record.GetString("title") + "\"")
+		app.Dao().SaveRecord(new_message)
+
 		return nil
 	})
 
@@ -180,6 +188,7 @@ func main() {
 		return nil
 	})
 
+	// Creating channels for location leaders
 	app.OnRecordAfterCreateRequest("locations").Add(func (e *core.RecordCreateEvent) error {
 		channels_collection, _ := app.Dao().FindCollectionByNameOrId("channels")
 		new_channel := models.NewRecord(channels_collection)
@@ -187,6 +196,15 @@ func main() {
 		location_leaders := e.Record.Get("leaders").([]string)
 		new_channel.Set("users", location_leaders)
 		app.Dao().SaveRecord(new_channel)
+
+		// Create initial message
+		messages_collection, _ := app.Dao().FindCollectionByNameOrId("messages")
+		new_message := models.NewRecord(messages_collection)
+		new_message.Set("user", e.Record.GetString("user"))
+		new_message.Set("channel", new_channel.Id)
+		new_message.Set("content", "This is the channel for the location \"" + e.Record.GetString("name") + "\"")
+		app.Dao().SaveRecord(new_message)
+
 		return nil
 	})
 
@@ -246,9 +264,9 @@ func main() {
 				}
 			}
 			
+			new_location, _ := app.Dao().FindRecordById("locations", new_location_id)
 			if is_leader {
 				// add to new channels
-				new_location, _ := app.Dao().FindRecordById("locations", new_location_id)
 				new_location_leaders := new_location.Get("leaders").([]string)
 				leader := new_location_leaders[0]
 				new_channels, _ := app.Dao().FindRecordsByFilter("channels", "(users ?~ {:user})", "-created", 0, 0, dbx.Params{"user": leader})
@@ -276,6 +294,14 @@ func main() {
 				channel.Set("isDefault", true)
 
 				app.Dao().SaveRecord(channel)
+
+				// create initial message
+				messages_collection, _ := app.Dao().FindCollectionByNameOrId("messages")
+				new_message := models.NewRecord(messages_collection)
+				new_message.Set("user", e.Record.Id)
+				new_message.Set("channel", channel.Id)
+				new_message.Set("content", "This is the channel for the location \"" + new_location.GetString("name") + "\"")
+				app.Dao().SaveRecord(new_message)
 			}
 		}
 
@@ -283,7 +309,7 @@ func main() {
 	})
 
 	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
-		e.Router.POST("/api/rsvp", func (c echo.Context) error {
+		e.Router.POST("/rsvp", func (c echo.Context) error {
 			announcement_id := c.QueryParam("announcement_id")
 			announcement_channels, _ := app.Dao().FindRecordsByFilter("channels", "announcement = {:announcement_id}", "-created", 0, 0, dbx.Params{"announcement_id": announcement_id})
 			announcement_channel := announcement_channels[0]
@@ -295,6 +321,7 @@ func main() {
 			}
 			
 			announcement_channel.Set("users", append(announcement_channel.Get("users").([]string), auth_record.Id))
+			app.Dao().SaveRecord(announcement_channel)
 			return c.JSON(http.StatusOK, map[string]interface{}{"status": "ok"})
 		})
 
