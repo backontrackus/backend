@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	ics "github.com/arran4/golang-ical"
 	"github.com/labstack/echo/v5"
@@ -16,6 +17,7 @@ import (
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/models"
+	"github.com/pocketbase/pocketbase/tools/cron"
 )
 
 func announce(app *pocketbase.PocketBase, record *models.Record, token string) {
@@ -56,6 +58,65 @@ func main() {
 	// serves static files from the provided public dir (if exists)
 	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
 		e.Router.GET("/*", apis.StaticDirectoryHandler(os.DirFS("./pb_public"), false))
+		return nil
+	})
+	
+	// add expiry cron job
+	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
+		scheduler := cron.New()
+
+		// 0 0 * * * - every day at midnight
+		scheduler.MustAdd("expiry", "0 0 * * *", func() {
+			announcements, _ := app.Dao().FindRecordsByFilter("announcements", "calendar != \"\"", "-created", 0, 0)
+
+			for _, v := range announcements {
+				filename := v.GetString("calendar")
+				url := "http://" + e.Server.Addr + "/api/files/announcements/" + v.Id + "/" + filename
+				resp, _ := http.Get(url)
+				data, _ := io.ReadAll(resp.Body)
+				cal, _ := ics.ParseCalendar(strings.NewReader(string(data)))
+				event := cal.Events()[0]
+				end, _ := event.GetEndAt()
+
+				if end.Before(time.Now()) {
+					app.Dao().Delete(v)
+
+					// remove from location ical
+					f, _ := os.Open("./pb_public/" + v.GetString("location") + ".ics")
+					f_data, _ := io.ReadAll(f)
+					l_ical, _ := ics.ParseCalendar(strings.NewReader(string(f_data)))
+
+					new_ical := ics.NewCalendar()
+					new_ical.SetMethod(ics.MethodRequest)
+					name := ""
+					for _, v := range l_ical.CalendarProperties {
+						v.IANAToken = "NAME"
+						name = v.Value
+					}
+
+					new_ical.SetName(name)
+
+					for _, v := range l_ical.Events() {
+						if v.Id() != event.Id() {
+							new_event := new_ical.AddEvent(v.Id())
+							new_event.SetSummary(v.GetProperty("SUMMARY").Value)
+							start, _ := v.GetStartAt()
+							new_event.SetStartAt(start)
+							end, _ := v.GetEndAt()
+							new_event.SetEndAt(end)
+							new_event.SetLocation(v.GetProperty("LOCATION").Value)
+							break
+						}
+					}
+
+					text := new_ical.Serialize()
+					f.Write([]byte(text))
+				}
+			}
+		})
+
+		scheduler.Start()
+
 		return nil
 	})
 
