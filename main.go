@@ -360,6 +360,9 @@ func main() {
 	// Location changing logic and channels
 	app.OnRecordBeforeUpdateRequest("users").Add(func(e *core.RecordUpdateEvent) error {
 		app.Dao().ExpandRecord(e.Record, []string{"location"}, nil)
+		if e.Record.Expand()["location"] == nil {
+			return nil
+		}
 		location := e.Record.Expand()["location"].(*models.Record)
 		app.Dao().ExpandRecord(location, []string{"leaders"}, nil)
 		is_leader := false
