@@ -1,0 +1,12 @@
+[Unit]
+Description=Start backontrack
+DefaultDependencies=no
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/bash /home/lukeo/backontrack/systemd/start_bot.sh
+TimeoutStartSec=0
+
+[Install]
+WantedBy=default.target
