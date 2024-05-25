@@ -425,7 +425,7 @@ func main() {
 			new_location, _ := app.Dao().FindRecordById("locations", new_location_id)
 			if is_leader {
 				// add to new channels
-				new_channels, _ := app.Dao().FindRecordsByFilter("channels", "location = {:location} && isDefault = True", "-created", 0, 0, dbx.Params{"location": new_location_id})
+				new_channels, _ := app.Dao().FindRecordsByFilter("channels", "(location = {:location} && isDefault = True)", "-created", 0, 0, dbx.Params{"location": new_location_id})
 
 				for _, v := range new_channels {
 					channel := v
