@@ -22,7 +22,7 @@ import (
 
 func announce(app *pocketbase.PocketBase, record *models.Record, token string) {
 	client := expo.NewPushClient(nil)
-	
+
 	pushToken, err := expo.NewExponentPushToken(token)
 
 	if err != nil {
@@ -37,8 +37,8 @@ func announce(app *pocketbase.PocketBase, record *models.Record, token string) {
 
 	response, err := client.Publish(
 		&expo.PushMessage{
-			To: []expo.ExponentPushToken{pushToken},
-			Body: body,
+			To:    []expo.ExponentPushToken{pushToken},
+			Body:  body,
 			Title: title,
 		},
 	)
@@ -60,7 +60,7 @@ func main() {
 		e.Router.GET("/*", apis.StaticDirectoryHandler(os.DirFS("./pb_public"), false))
 		return nil
 	})
-	
+
 	// add expiry cron job
 	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
 		scheduler := cron.New()
@@ -143,7 +143,7 @@ func main() {
 		}
 
 		users, err := app.Dao().FindRecordsByFilter("users", "location = {:location}", "-created", 0, 0, dbx.Params{"location": location})
-	
+
 		if err != nil {
 			log.Default().Println(err)
 		}
@@ -170,7 +170,7 @@ func main() {
 	})
 
 	// Creating channels for announcements
-	app.OnRecordAfterCreateRequest("announcements").Add(func (e *core.RecordCreateEvent) error {
+	app.OnRecordAfterCreateRequest("announcements").Add(func(e *core.RecordCreateEvent) error {
 		channels_collection, _ := app.Dao().FindCollectionByNameOrId("channels")
 		new_channel := models.NewRecord(channels_collection)
 		new_channel.Set("isDefault", false)
@@ -187,17 +187,17 @@ func main() {
 		new_message := models.NewRecord(messages_collection)
 		new_message.Set("user", e.Record.GetString("user"))
 		new_message.Set("channel", new_channel.Id)
-		new_message.Set("content", "This is the channel for the announcement \"" + e.Record.GetString("title") + "\"")
+		new_message.Set("content", "This is the channel for the announcement \""+e.Record.GetString("title")+"\"")
 		app.Dao().SaveRecord(new_message)
 
 		return nil
 	})
 
 	// Add ical to public dir
-	app.OnRecordAfterCreateRequest("announcements").Add(func (e *core.RecordCreateEvent) error {
+	app.OnRecordAfterCreateRequest("announcements").Add(func(e *core.RecordCreateEvent) error {
 		location_file, _ := os.ReadFile("./pb_public/" + e.Record.GetString("location") + ".ics")
 		location_cal, _ := ics.ParseCalendar(strings.NewReader(string(location_file)))
-		
+
 		announcement_files := e.UploadedFiles["calendar"]
 		if len(announcement_files) == 0 {
 			return nil
@@ -225,14 +225,14 @@ func main() {
 
 		f, _ := os.Create("./pb_public/" + e.Record.GetString("location") + ".ics")
 		f.Write([]byte(text))
-		
+
 		return nil
 	})
 
-	app.OnRecordAfterUpdateRequest("announcements").Add(func (e *core.RecordUpdateEvent) error {
+	app.OnRecordAfterUpdateRequest("announcements").Add(func(e *core.RecordUpdateEvent) error {
 		location_file, _ := os.ReadFile("./pb_public/" + e.Record.GetString("location") + ".ics")
 		location_cal, _ := ics.ParseCalendar(strings.NewReader(string(location_file)))
-		
+
 		announcement_files := e.UploadedFiles["calendar"]
 		if len(announcement_files) == 0 {
 			return nil
@@ -260,17 +260,17 @@ func main() {
 
 		f, _ := os.Create("./pb_public/" + e.Record.GetString("location") + ".ics")
 		f.Write([]byte(text))
-		
+
 		return nil
 	})
 
 	// Push notifications for messages
-	app.OnRecordAfterCreateRequest("messages").Add(func (e *core.RecordCreateEvent) error {
+	app.OnRecordAfterCreateRequest("messages").Add(func(e *core.RecordCreateEvent) error {
 		app.Dao().ExpandRecord(e.Record, []string{"channel"}, nil)
 		channel := e.Record.Expand()["channel"].(*models.Record)
 		app.Dao().ExpandRecord(channel, []string{"users"}, nil)
 		users := channel.Expand()["users"].([]*models.Record)
-		
+
 		tokens := []string{}
 
 		for _, u := range users {
@@ -292,29 +292,29 @@ func main() {
 
 		for _, t := range tokens {
 			pushToken, err := expo.NewExponentPushToken(t)
-		
+
 			if err != nil {
 				log.Default().Panicln(err)
 			}
-		
+
 			app.Dao().ExpandRecord(e.Record, []string{"user"}, nil)
 			user := e.Record.Expand()["user"].(*models.Record)
 			user_name := user.GetString("name")
 			title := fmt.Sprint("New announcement from ", user_name)
 			body := e.Record.GetString("content")
-		
+
 			response, err := client.Publish(
 				&expo.PushMessage{
-					To: []expo.ExponentPushToken{pushToken},
-					Body: body,
+					To:    []expo.ExponentPushToken{pushToken},
+					Body:  body,
 					Title: title,
 				},
 			)
-		
+
 			if err != nil {
 				log.Default().Panicln(err)
 			}
-		
+
 			if response.ValidateResponse() != nil {
 				fmt.Println(response.PushMessage.To, "failed")
 			}
@@ -324,7 +324,7 @@ func main() {
 	})
 
 	// Creating channels for location leaders
-	app.OnRecordAfterCreateRequest("locations").Add(func (e *core.RecordCreateEvent) error {
+	app.OnRecordAfterCreateRequest("locations").Add(func(e *core.RecordCreateEvent) error {
 		channels_collection, _ := app.Dao().FindCollectionByNameOrId("channels")
 		new_channel := models.NewRecord(channels_collection)
 		new_channel.Set("isDefault", true)
@@ -337,14 +337,14 @@ func main() {
 		new_message := models.NewRecord(messages_collection)
 		new_message.Set("user", e.Record.GetString("user"))
 		new_message.Set("channel", new_channel.Id)
-		new_message.Set("content", "This is the channel for the location \"" + e.Record.GetString("name") + "\"")
+		new_message.Set("content", "This is the channel for the location \""+e.Record.GetString("name")+"\"")
 		app.Dao().SaveRecord(new_message)
 
 		return nil
 	})
 
 	// Create location ical
-	app.OnRecordAfterCreateRequest("locations").Add(func (e *core.RecordCreateEvent) error {
+	app.OnRecordAfterCreateRequest("locations").Add(func(e *core.RecordCreateEvent) error {
 		cal := ics.NewCalendar()
 		cal.SetMethod(ics.MethodRequest)
 		cal.SetName(e.Record.GetString("name"))
@@ -358,17 +358,20 @@ func main() {
 	})
 
 	// Location changing logic and channels
-	app.OnRecordBeforeUpdateRequest("users").Add(func (e *core.RecordUpdateEvent) error {
+	app.OnRecordBeforeUpdateRequest("users").Add(func(e *core.RecordUpdateEvent) error {
 		app.Dao().ExpandRecord(e.Record, []string{"location"}, nil)
 		location := e.Record.Expand()["location"].(*models.Record)
 		app.Dao().ExpandRecord(location, []string{"leaders"}, nil)
-		leaders := location.Expand()["leaders"].([](*models.Record))
-
 		is_leader := false
-		for _, element := range leaders {
-			if element.Id == e.Record.Id {
-				is_leader = true
-				break
+		leaders := [](*models.Record){}
+		leaders_record, leaders_ok := location.Expand()["leaders"]
+		if leaders_ok {
+			leaders = leaders_record.([](*models.Record))
+			for _, element := range leaders {
+				if element.Id == e.Record.Id {
+					is_leader = true
+					break
+				}
 			}
 		}
 
@@ -376,9 +379,12 @@ func main() {
 		new_location_id := e.Record.GetString("location")
 
 		location_changed := old_location_id != new_location_id
+		old_location_leaders := []string{}
+		old_location, old_location_ok := app.Dao().FindRecordById("locations", old_location_id)
+		if old_location_ok == nil {
+			old_location_leaders = old_location.Get("leaders").([]string)
+		}
 
-		old_location, _ := app.Dao().FindRecordById("locations", old_location_id)
-		old_location_leaders := old_location.Get("leaders").([]string)
 		was_leader := false
 		for _, v := range old_location_leaders {
 			if v == e.Record.Id {
@@ -412,14 +418,14 @@ func main() {
 
 				}
 			}
-			
+
 			new_location, _ := app.Dao().FindRecordById("locations", new_location_id)
 			if is_leader {
 				// add to new channels
 				new_location_leaders := new_location.Get("leaders").([]string)
 				leader := new_location_leaders[0]
 				new_channels, _ := app.Dao().FindRecordsByFilter("channels", "(users ?~ {:user})", "-created", 0, 0, dbx.Params{"user": leader})
-				
+
 				for _, v := range new_channels {
 					channel := v
 					users := channel.Get("users").([]string)
@@ -449,7 +455,7 @@ func main() {
 				new_message := models.NewRecord(messages_collection)
 				new_message.Set("user", e.Record.Id)
 				new_message.Set("channel", channel.Id)
-				new_message.Set("content", "This is the channel for the location \"" + new_location.GetString("name") + "\"")
+				new_message.Set("content", "This is the channel for the location \""+new_location.GetString("name")+"\"")
 				app.Dao().SaveRecord(new_message)
 			}
 		}
@@ -458,7 +464,7 @@ func main() {
 	})
 
 	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
-		e.Router.POST("/rsvp", func (c echo.Context) error {
+		e.Router.POST("/rsvp", func(c echo.Context) error {
 			announcement_id := c.QueryParam("announcement_id")
 			announcement_channels, _ := app.Dao().FindRecordsByFilter("channels", "announcement = {:announcement_id}", "-created", 0, 0, dbx.Params{"announcement_id": announcement_id})
 			announcement_channel := announcement_channels[0]
@@ -468,7 +474,7 @@ func main() {
 			if auth_record == nil {
 				return c.JSON(http.StatusUnauthorized, map[string]interface{}{"status": "unauthorized"})
 			}
-			
+
 			announcement_channel.Set("users", append(announcement_channel.Get("users").([]string), auth_record.Id))
 			app.Dao().SaveRecord(announcement_channel)
 			return c.JSON(http.StatusOK, map[string]interface{}{"status": "ok"})
