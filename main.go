@@ -323,7 +323,7 @@ func main() {
 		new_channel.Set("isDefault", true)
 		location_leaders := e.Record.Get("leaders").([]string)
 		new_channel.Set("users", location_leaders)
-		new_channel.Set("title", "Leaders of \""+e.Record.GetString("name")+"\"")
+		new_channel.Set("title", "Leaders of Back on Track "+e.Record.GetString("name"))
 		app.Dao().SaveRecord(new_channel)
 
 		return nil
@@ -435,16 +435,9 @@ func main() {
 				channel.Set("users", users)
 				channel.Set("isDefault", true)
 				channel.Set("location", new_location_id)
+				channel.Set("title", "Back on Track \""+new_location.GetString("name")+"\"")
 
 				app.Dao().SaveRecord(channel)
-
-				// create initial message
-				messages_collection, _ := app.Dao().FindCollectionByNameOrId("messages")
-				new_message := models.NewRecord(messages_collection)
-				new_message.Set("user", e.Record.Id)
-				new_message.Set("channel", channel.Id)
-				new_message.Set("content", "This is the channel for the location \""+new_location.GetString("name")+"\"")
-				app.Dao().SaveRecord(new_message)
 			}
 		}
 
