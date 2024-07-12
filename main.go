@@ -180,15 +180,8 @@ func main() {
 
 		new_channel.Set("users", location.Get("leaders").([]string))
 		new_channel.Set("announcement", e.Record.Id)
+		new_channel.Set("title", "Announcement: \""+e.Record.GetString("title")+"\"")
 		app.Dao().SaveRecord(new_channel)
-
-		// Create initial message
-		messages_collection, _ := app.Dao().FindCollectionByNameOrId("messages")
-		new_message := models.NewRecord(messages_collection)
-		new_message.Set("user", e.Record.GetString("user"))
-		new_message.Set("channel", new_channel.Id)
-		new_message.Set("content", "This is the channel for the announcement \""+e.Record.GetString("title")+"\"")
-		app.Dao().SaveRecord(new_message)
 
 		return nil
 	})
@@ -330,15 +323,8 @@ func main() {
 		new_channel.Set("isDefault", true)
 		location_leaders := e.Record.Get("leaders").([]string)
 		new_channel.Set("users", location_leaders)
+		new_channel.Set("title", "Leaders of \""+e.Record.GetString("name")+"\"")
 		app.Dao().SaveRecord(new_channel)
-
-		// Create initial message
-		messages_collection, _ := app.Dao().FindCollectionByNameOrId("messages")
-		new_message := models.NewRecord(messages_collection)
-		new_message.Set("user", e.Record.GetString("user"))
-		new_message.Set("channel", new_channel.Id)
-		new_message.Set("content", "This is the channel for the location \""+e.Record.GetString("name")+"\"")
-		app.Dao().SaveRecord(new_message)
 
 		return nil
 	})
