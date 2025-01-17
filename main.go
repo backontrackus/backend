@@ -60,56 +60,56 @@ func main() {
 
 	// add expiry cron job
 	app.Cron().MustAdd("expiry", "0 0 * * *", func() {
-    announcements, _ := app.FindRecordsByFilter("announcements", "calendar != \"\"", "-created", 0, 0)
+		announcements, _ := app.FindRecordsByFilter("announcements", "calendar != \"\"", "-created", 0, 0)
 
-    for _, v := range announcements {
-      filename := v.GetString("calendar")
-      url := v.BaseFilesPath() + "/" + filename
-      resp, _ := http.Get(url)
-      data, _ := io.ReadAll(resp.Body)
-      cal, _ := ics.ParseCalendar(strings.NewReader(string(data)))
-      event := cal.Events()[0]
-      end, _ := event.GetEndAt()
+		for _, v := range announcements {
+			filename := v.GetString("calendar")
+			url := v.BaseFilesPath() + "/" + filename
+			resp, _ := http.Get(url)
+			data, _ := io.ReadAll(resp.Body)
+			cal, _ := ics.ParseCalendar(strings.NewReader(string(data)))
+			event := cal.Events()[0]
+			end, _ := event.GetEndAt()
 
-      if end.Before(time.Now()) {
-        app.Delete(v)
+			if end.Before(time.Now()) {
+				app.Delete(v)
 
-        // remove from location ical
-        f, _ := os.Open("./pb_public/" + v.GetString("location") + ".ics")
-        f_data, _ := io.ReadAll(f)
-        l_ical, _ := ics.ParseCalendar(strings.NewReader(string(f_data)))
+				// remove from location ical
+				f, _ := os.Open("./pb_public/" + v.GetString("location") + ".ics")
+				f_data, _ := io.ReadAll(f)
+				l_ical, _ := ics.ParseCalendar(strings.NewReader(string(f_data)))
 
-        new_ical := ics.NewCalendar()
-        new_ical.SetMethod(ics.MethodRequest)
-        name := ""
-        for _, v := range l_ical.CalendarProperties {
-          v.IANAToken = "NAME"
-          name = v.Value
-        }
+				new_ical := ics.NewCalendar()
+				new_ical.SetMethod(ics.MethodRequest)
+				name := ""
+				for _, v := range l_ical.CalendarProperties {
+					v.IANAToken = "NAME"
+					name = v.Value
+				}
 
-        new_ical.SetName(name)
+				new_ical.SetName(name)
 
-        for _, v := range l_ical.Events() {
-          if v.Id() != event.Id() {
-            new_event := new_ical.AddEvent(v.Id())
-            new_event.SetSummary(v.GetProperty("SUMMARY").Value)
-            start, _ := v.GetStartAt()
-            new_event.SetStartAt(start)
-            end, _ := v.GetEndAt()
-            new_event.SetEndAt(end)
-            new_event.SetLocation(v.GetProperty("LOCATION").Value)
-            break
-          }
-        }
+				for _, v := range l_ical.Events() {
+					if v.Id() != event.Id() {
+						new_event := new_ical.AddEvent(v.Id())
+						new_event.SetSummary(v.GetProperty("SUMMARY").Value)
+						start, _ := v.GetStartAt()
+						new_event.SetStartAt(start)
+						end, _ := v.GetEndAt()
+						new_event.SetEndAt(end)
+						new_event.SetLocation(v.GetProperty("LOCATION").Value)
+						break
+					}
+				}
 
-        text := new_ical.Serialize()
-        f.Write([]byte(text))
-      }
-    }
-  })
+				text := new_ical.Serialize()
+				f.Write([]byte(text))
+			}
+		}
+	})
 
 	// Announcements notifications
-	app.OnRecordCreateRequest("announcements").BindFunc(func(e *core.RecordRequestEvent) error {
+	app.OnRecordAfterCreateSuccess("announcements").BindFunc(func(e *core.RecordEvent) error {
 		location := e.Record.GetString("location")
 
 		if location == "" {
@@ -154,11 +154,11 @@ func main() {
 			announce(app, e.Record, t)
 		}
 
-		return nil
+		return e.Next()
 	})
 
 	// Creating channels for announcements
-	app.OnRecordCreateRequest("announcements").BindFunc(func(e *core.RecordRequestEvent) error {
+	app.OnRecordAfterCreateSuccess("announcements").BindFunc(func(e *core.RecordEvent) error {
 		channels_collection, _ := app.FindCollectionByNameOrId("channels")
 		new_channel := core.NewRecord(channels_collection)
 		new_channel.Set("isDefault", false)
@@ -171,21 +171,21 @@ func main() {
 		new_channel.Set("title", "Announcement: \""+e.Record.GetString("title")+"\"")
 		app.Save(new_channel)
 
-		return nil
+		return e.Next()
 	})
 
 	// Add ical to public dir
-	app.OnRecordCreateRequest("announcements").BindFunc(func(e *core.RecordRequestEvent) error {
+	app.OnRecordAfterCreateSuccess("announcements").BindFunc(func(e *core.RecordEvent) error {
 		location_file, _ := os.ReadFile("./pb_public/" + e.Record.GetString("location") + ".ics")
 		location_cal, _ := ics.ParseCalendar(strings.NewReader(string(location_file)))
 
 		announcement_files := e.Record.GetUploadedFiles("calendar")
 		if len(announcement_files) == 0 {
-			return nil
+			return e.Next()
 		}
 		file := announcement_files[0]
 		if file == nil {
-			return nil
+			return e.Next()
 		}
 		r, _ := file.Reader.Open()
 		data, _ := io.ReadAll(r)
@@ -207,20 +207,20 @@ func main() {
 		f, _ := os.Create("./pb_public/" + e.Record.GetString("location") + ".ics")
 		f.Write([]byte(text))
 
-		return nil
+		return e.Next()
 	})
 
-	app.OnRecordUpdateRequest("announcements").BindFunc(func(e *core.RecordRequestEvent) error {
+	app.OnRecordAfterUpdateSuccess("announcements").BindFunc(func(e *core.RecordEvent) error {
 		location_file, _ := os.ReadFile("./pb_public/" + e.Record.GetString("location") + ".ics")
 		location_cal, _ := ics.ParseCalendar(strings.NewReader(string(location_file)))
 
 		announcement_files := e.Record.GetUploadedFiles("calendar")
 		if len(announcement_files) == 0 {
-			return nil
+			return e.Next()
 		}
 		file := announcement_files[0]
 		if file == nil {
-			return nil
+			return e.Next()
 		}
 		r, _ := file.Reader.Open()
 		data, _ := io.ReadAll(r)
@@ -242,11 +242,11 @@ func main() {
 		f, _ := os.Create("./pb_public/" + e.Record.GetString("location") + ".ics")
 		f.Write([]byte(text))
 
-		return nil
+		return e.Next()
 	})
 
 	// Push notifications for messages
-	app.OnRecordCreateRequest("messages").BindFunc(func(e *core.RecordRequestEvent) error {
+	app.OnRecordAfterCreateSuccess("messages").BindFunc(func(e *core.RecordEvent) error {
 		app.ExpandRecord(e.Record, []string{"channel"}, nil)
 		channel := e.Record.Expand()["channel"].(*core.Record)
 		app.ExpandRecord(channel, []string{"users"}, nil)
@@ -301,11 +301,11 @@ func main() {
 			}
 		}
 
-		return nil
+		return e.Next()
 	})
 
 	// Creating channels for location leaders
-	app.OnRecordCreateRequest("locations").BindFunc(func(e *core.RecordRequestEvent) error {
+	app.OnRecordAfterCreateSuccess("locations").BindFunc(func(e *core.RecordEvent) error {
 		channels_collection, _ := app.FindCollectionByNameOrId("channels")
 		new_channel := core.NewRecord(channels_collection)
 		new_channel.Set("isDefault", true)
@@ -314,11 +314,11 @@ func main() {
 		new_channel.Set("title", "Leaders of Back on Track "+e.Record.GetString("name"))
 		app.Save(new_channel)
 
-		return nil
+		return e.Next()
 	})
 
 	// Create location ical
-	app.OnRecordCreateRequest("locations").BindFunc(func(e *core.RecordRequestEvent) error {
+	app.OnRecordAfterCreateSuccess("locations").BindFunc(func(e *core.RecordEvent) error {
 		cal := ics.NewCalendar()
 		cal.SetMethod(ics.MethodRequest)
 		cal.SetName(e.Record.GetString("name"))
@@ -328,14 +328,14 @@ func main() {
 		f, _ := os.Create("./pb_public/" + e.Record.Id + ".ics")
 		f.Write([]byte(text))
 
-		return nil
+		return e.Next()
 	})
 
 	// Location changing logic and channels
-	app.OnRecordUpdateRequest("users").BindFunc(func(e *core.RecordRequestEvent) error {
+	app.OnRecordAfterUpdateSuccess("users").BindFunc(func(e *core.RecordEvent) error {
 		app.ExpandRecord(e.Record, []string{"location"}, nil)
 		if e.Record.Expand()["location"] == nil {
-			return nil
+			return e.Next()
 		}
 		location := e.Record.Expand()["location"].(*core.Record)
 		app.ExpandRecord(location, []string{"leaders"}, nil)
@@ -429,7 +429,7 @@ func main() {
 			}
 		}
 
-		return nil
+		return e.Next()
 	})
 
 	app.OnServe().BindFunc(func(se *core.ServeEvent) error {
