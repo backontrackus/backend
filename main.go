@@ -281,7 +281,7 @@ func main() {
 			app.ExpandRecord(e.Record, []string{"user"}, nil)
 			user := e.Record.Expand()["user"].(*core.Record)
 			user_name := user.GetString("name")
-			title := fmt.Sprint("New announcement from ", user_name)
+			title := fmt.Sprint(user_name)
 			body := e.Record.GetString("content")
 
 			response, err := client.Publish(
