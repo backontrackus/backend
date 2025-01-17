@@ -2,13 +2,15 @@ module bot
 
 go 1.23
 
-toolchain go1.23.4
-
-require github.com/pocketbase/pocketbase v0.24.3
+require (
+	github.com/arran4/golang-ical v0.2.0
+	github.com/oliveroneill/exponent-server-sdk-golang v0.0.0-20210823140141-d050598be512
+	github.com/pocketbase/dbx v1.11.0
+	github.com/pocketbase/pocketbase v0.24.3
+)
 
 require (
 	github.com/AlecAivazis/survey/v2 v2.3.7 // indirect
-	github.com/arran4/golang-ical v0.2.0 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
 	github.com/aws/aws-sdk-go v1.55.5 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.33.0 // indirect
@@ -54,8 +56,6 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.17 // indirect
 	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d // indirect
 	github.com/ncruces/go-strftime v0.1.9 // indirect
-	github.com/oliveroneill/exponent-server-sdk-golang v0.0.0-20210823140141-d050598be512 // indirect
-	github.com/pocketbase/dbx v1.11.0 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/spf13/cast v1.7.1 // indirect
 	github.com/spf13/cobra v1.8.1 // indirect
